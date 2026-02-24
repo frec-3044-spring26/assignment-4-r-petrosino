@@ -18,8 +18,12 @@ The data are in a multi-sheet Excel file named `data/lake_ice_off_data.xlsx`. Yo
 For some reason, `read_excel()` does not like relative paths, so we will use the `here` package to locate your project on your computer. First, install the `here` package.  Then, run the `here()` function to get the path to your project.  Using `file.path()` appends the results of `here()` to the location of the data within your project/GitHub repository.
 
 ```{r}
+install.packages("here")
+
 library(here)
 file_name <- file.path(here(),"data/lake_ice_off_data.xlsx")
+
+library(tidyverse)
 ```
 
 Now use `read_excel()` to read in `file_name`. Remember that Excel files can have multiple sheets.
@@ -27,11 +31,16 @@ Now use `read_excel()` to read in `file_name`. Remember that Excel files can hav
 ```{r}
 library(readxl)
 
+excel_sheets(file_name)
+
+lakedata <- read_excel(file_name, sheet = "data")
+
 ```
 
 Now, look at a preview of the data using the `head()` function. The `doy` in `ice_off_doy` stands for "day of the year" and is the day within the year where ice off occurred (January 1 = doy 1).  `did_not_freeze` is a column where 1 = did not freeze and 0 = did freeze.
 
 ```{r}
+head(lakedata)
 
 ```
 
@@ -42,6 +51,14 @@ There should be four columns and \~2703 rows.
 We will practice key skills in the module using a focal lake. Use the `filter` function to filter the more extensive data to only contain the data from Lake Sunapee, a lake in New Hampshire. Filter the data `ice_data` by the variable `lake_name` to create a data frame called `sunapee`.
 
 ```{r}
+colnames(lakedata)
+
+library(dplyr)
+
+sunapee <- lakedata |>
+  filter(lake_name == "Sunapee")
+
+
 
 ```
 
@@ -58,6 +75,12 @@ Be sure that the title, x-axis, and y-axis labels are clearly labeled.
 **Answer 1:**
 
 ```{r}
+sunapee |>
+  ggplot(aes(x = year, y = ice_off_doy)) +
+  geom_point() +
+  geom_line() +
+  labs(x = "Year", y = "Ice off DOY", title = "Lake Sunapee Ice Off Dates Over Time")
+
 
 ```
 
@@ -76,13 +99,18 @@ Use the `lm` function to predict `ice_off_doy` as a function (`~`) of the year f
 Create an object called `fit` that contains the results of the linear model.
 
 ```{r}
+fit <- lm(ice_off_doy ~ year, data = sunapee)
+
+summary(fit)
+
+#I would expect the slope to be negative. As the climate warms over time, lakes tend to thaw earlier in the year. Because ice off doy measures the day of the year when ice melts, earlier ice off dates correspond to smaller DOY values. If ice off is happening sooner year after year, the DOY will decrease as year increases, resulting in a negative slope. 
 
 ```
 
 Then, use the function `summary` to explore the result of the `lm` function.
 
 ```{r}
-
+summary(fit)
 ```
 
 The results of your linear model are in an object named `fit`, so you can find the regression coefficients at `fit$coefficients[1]` (the intercept) and `fit$coefficients[2]` (the slope). Confirm that `fit$coefficients[1]` and `fit$coefficients[2]` match the values expected from the summary command you ran above.
@@ -102,6 +130,9 @@ What is the direction of the slope? How does this match your expectations from Q
 
 ## R2
 
+#the direction of the slope is negative, this means ice off is happening sooner each year. R2 = 0.2055, which is considered ok for environmental data, making our model good. This matches my expectations from question 2, where I believed the slope would be negative as the climate warms, causing ice off doy to decrease.  
+
+
 First, it is important to understand how much variation is explained by the model using the R2 value in the `summary`. A value of R2 close to 1 means that the predictor (`year`) explains nearly all of the variation in the variable we are predicting: `ice_off_doy`. A value of R2 close to 0 explains very little of the variation in `ice_off_doy`. Since we want to be able to explain how `ice_off_doy` is changing over time using `year,` we are aiming for a high R2. A low R2 would indicate that our model isn't particularly good at explaining what future values of `ice_off_doy` will be.
 
 **Question 4:**
@@ -111,6 +142,10 @@ What is the R2 for the regression? Based on the R2, is `year` and `ice_off_doy` 
 **Answer 4:**
 
 ## Residuals normally distributed
+
+#The R2 for the regression model is 0.2055. Based off this, year explains roughly 21% of ice off doy. Given the amount of variables and noise that can impact ice off doy (snow pack, weather fluctuations, cloudiness, etc.), an R2 of 0.2055 is decent.  
+https://academic-med-surg.scholasticahq.com/article/125154-determining-a-meaningful-r-squared-value-in-clinical-medicine 
+
 
 Second, it is important that the residuals from our linear model are normally distributed.  The following is a normal distribution that you can visually compare to:
 
@@ -128,6 +163,13 @@ We will use a histogram to visually assess whether this requirement is met. Firs
 You will use a histogram to examine the residuals. First, the code uses the coefficients to predict the yearly ice-off DOY. Second, calculate the residuals by subtracting the predicted ice-off DOY from the observed DOY.
 
 ```{r}
+str(sunapee)
+
+sunapee <- sunapee |>
+  mutate(
+    ice_off_doy = as.numeric(ice_off_doy),
+    year = as.numeric(year))
+
 sunapee <- sunapee %>% 
   mutate(predicted = fit$coefficients[1] + year * fit$coefficients[2], 
          residual = ice_off_doy - predicted) #Observed - Predicted
@@ -140,6 +182,12 @@ Use the [`add_predictions()`](https://modelr.tidyverse.org/reference/add_predict
 **Answer 5:**
 
 ```{r}
+library(modelr)
+sunapee_res_pred <- sunapee |>
+  add_predictions(fit) |>
+  add_residuals(fit)
+
+head(sunapee_res_pred)
 
 ```
 
@@ -152,6 +200,11 @@ Show Histogram and answer the following question: do the residuals meet the assu
 **Answer 6:**
 
 ```{r}
+sunapee_res_pred |>
+  ggplot(aes(x = resid)) +
+  geom_histogram(binwidth = 10) +
+  labs(x = "Residuals", y = "Counts", title = "Residuals for Lake Sunapee Model")
+
 
 ```
 
@@ -170,6 +223,9 @@ Based on the `summary()` above, what is the p-value for the slope?
 
 A slope value could have a low probability of being 0 (thus we have a strong belief that it is not zero), but the magnitude of change is functionally meaningless in the physical world (i.e., the rate of change is so small that we would not think much of it). This can occur particularly when analyzing large datasets.
 
+#The p-value for the slope is 2.5 * 10^-9, which is very small. This indicates that the probability of observing this slope if the true slope were zero is almost zero. Therefore, we reject the null hypothesis that the slope is equal to zero. There is strong statistical evidence that year is related to ice off doy. 
+
+
 **Question 8:**
 
 Based on the slope value, how many more years are needed to pass before the lake has a 1 week change in ice off doy? Do you think this is meaningful? Why?
@@ -178,17 +234,43 @@ Based on the slope value, how many more years are needed to pass before the lake
 
 ## Overall model assessment
 
+#Based on my slope value of -0.1060227, ice of doy occurs about 0.106 days sooner each year. 7 / 0.106 = 66.04 years, or about 66 years and 15 days to see a 1 week sooner ice off doy. 
+
 **Question 9:**
 
 How comfortable are you proceeding with using this linear model for additional analysis and prediction? Why? (I am not looking for your gut answer, rather I want you to apply concepts taught in this module to justify your answer)
 
 **Answer 9:**
+#I am not very comfortable using this model for long term predictions. Although the slope and r2 values are statistically significant, the r2 value is still only 0.2055, meaning that year only explains about 21% of the variation in ice off doy. This is enough to tell us that there is a correlation between year and ice off doy, but ~79% of the variability is driven by other environmental factors not included in the model. While the residuals appear reasonably centered around zero, the moderate r2 limits confidence in future predictions. Therefore, the model shows a meaningful trend, but it is not strong enough to rely on heavily for accurate forecasting. The model could be improved if we decided to use data from other lakes, or if other factors were used in the model, such as yearly snow pack and cloudiness. 
+
 
 **Question 10:**
 Now plot the data for Lake Sunapee (just like above - year on x-axis vs. ice of doy on y axis) but add the line from your regression results (e.g., fit intercept and slope). You will use the [`geom_abline`](https://ggplot2.tidyverse.org/reference/geom_abline.html). 
 
 **Answer 10:**
 ```{r}
+sunapee |>
+  ggplot(aes(x = year, y = ice_off_doy)) +
+  geom_point() +
+  geom_line() +
+  geom_abline(
+    intercept = coef(fit)[1],
+    slope = coef(fit)[2],
+    color = "red",
+    linewidth = 1) +
+  labs(
+    x = "Year", y = "Ice Off DOY", title = "Sunapee Ice Off Dates with Linear Regression")
+
+sunapee |>
+  ggplot(aes(x = year, y = ice_off_doy)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth(method = "loess", se = FALSE, color = "red") +
+  labs(x = "Year", y = "Ice Off DOY", title = "Sunapee Ice Off Dates LOESS Smoothing")
+
+#chatgpt whats the issue with this code (insert screenshot of error message)
+#needed to add se = FALSE, 
+
 
 ```
 
@@ -204,7 +286,28 @@ The goal of this question is to make a forecast of the future ice-off day (with 
 **Answer 11:**
 
 ```{r}
+pred2040 <- predict(fit, newdata = data.frame(year = 2040))
 
+view(pred2040)
+
+
+resids <- sunapee_res_pred$resid
+
+lower5 <- quantile(resids, 0.05)
+upper95 <- quantile(resids, 0.95)
+
+view(lower5)
+view(upper95)
+
+lower_conf <- pred2040 + lower5
+upper_conf <- pred2040 + upper95
+
+view(lower_conf)
+view(upper_conf)
+
+
+conf_width <- upper_conf - lower_conf
+view(conf_width)
 ```
 
 # Is the ice-off day of the year changing more quickly in more recent years at Lake Sunapee?
@@ -218,6 +321,36 @@ Use the skills developed above to evaluate the question "Is the ice-off day of y
 **Answer 12:**
 
 Use a mix of code, figures, and text to present your analysis.  If you want to compare slopes, be sure they are on the same plot.
+
+```{r}
+sunapee_pre70 <- sunapee |>
+  filter(year < 1970)
+
+sunapee_post70 <- sunapee |>
+  filter(year >= 1970)
+
+
+fit_pre70 <- lm(ice_off_doy ~ year, data = sunapee_pre70)
+fit_post70  <- lm(ice_off_doy ~ year, data = sunapee_post70)
+
+summary(fit_pre70)
+summary(fit_post70)
+
+
+#regression  lines 
+sunapee |>
+  ggplot(aes(x = year, y = ice_off_doy)) +
+  geom_point() +
+  geom_smooth(data = sunapee_pre70,method = "lm",se = FALSE,color = "blue", linewidth = 1) +
+  geom_smooth(data = sunapee_post70,method = "lm",se = FALSE,color = "red",linewidth = 1) +
+  labs(title = "Lake Sunapee ice off pre and post 1970",x = "Year",y = "Ice off DOY")
+
+coef(fit_pre70)
+coef(fit_post70)
+
+#There is evidence that ice off is occurring sooner in the year after 1970. Before 1970, the slope was –0.109668 days per year. After 1970, the slope became much steeper at –0.3023923 days per year. Because the post 1970 slope is almost 3 times greater, the model suggest that the rate of change has accelerated after 1970. Therefore, the data indicates that ice off doy is changing has been happening sooner after 1970.
+
+```
 
 # Rendering and committing
 
