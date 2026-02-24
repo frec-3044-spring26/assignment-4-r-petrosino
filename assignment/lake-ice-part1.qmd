@@ -1,6 +1,6 @@
 ---
 title: "Lake Ice Phenology: Part 1"
-author: 'YOUR NAME'
+author: 'Robert Petrosino'
 format:
   html:
     embed-resources: true
@@ -18,12 +18,20 @@ The data are in a multi-sheet Excel file named `data/lake_ice_off_data.xlsx`. Yo
 For some reason, `read_excel()` does not like relative paths, so we will use the `here` package to locate your project on your computer. First, install the `here` package.  Then, run the `here()` function to get the path to your project.  Using `file.path()` appends the results of `here()` to the location of the data within your project/GitHub repository.
 
 ```{r}
-install.packages("here")
+#install.packages("here")
 
 library(here)
 file_name <- file.path(here(),"data/lake_ice_off_data.xlsx")
 
 library(tidyverse)
+
+#chatgpt why am i getting this error- WARNING: Rtools is required to build R packages but is not currently installed. Please download and install the appropriate version of Rtools before proceeding:
+#relevant info below
+library(here)
+library(tidyverse)
+library(readxl)
+
+file_name <- file.path(here(), "data/lake_ice_off_data.xlsx")
 ```
 
 Now use `read_excel()` to read in `file_name`. Remember that Excel files can have multiple sheets.
